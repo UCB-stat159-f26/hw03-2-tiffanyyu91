@@ -1,32 +1,26 @@
 
 import json
 import re
+from functools import lru_cache
+from io import StringIO
 
 import pandas as pd
 import requests
 
 
-# Player information
-# Additional players can be added here.
-PLAYERS = {
-    "serenawilliams": ("SerenaWilliams", "1981-09-26"),
-    "rafaelnadal": ("RafaelNadal", "1986-06-03"),
-}
-
-
 def _normalize_name(player_name):
-    """Normalize capitalization and spacing."""
-    if not isinstance(player_name, str):
-        raise ValueError("Player name must be a string.")
-    return re.sub(r"\s+", "", player_name).lower()
+    """Convert a player name to Tennis Abstract's URL format."""
+    if not isinstance(player_name, str) or not player_name.strip():
+        raise ValueError("Player name must be a nonempty string.")
+    parts = player_name.split()
+    if len(parts) > 1:
+        return "".join(word.capitalize() for word in parts)
+    return parts[0]
 
 
 def _download_player_data(player_id):
-    """Download career match data from Tennis Abstract."""
-    url = (
-        "https://www.tennisabstract.com/jsmatches/"
-        f"{player_id}Career.js"
-    )
+    """Download a player's career match JavaScript."""
+    url = f"https://www.tennisabstract.com/jsmatches/{player_id}Career.js"
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.tennisabstract.com/"
@@ -36,100 +30,148 @@ def _download_player_data(player_id):
         response.raise_for_status()
     except requests.RequestException as error:
         raise ValueError(
-            f"Could not retrieve data for {player_id}: {error}"
+            f"Could not retrieve matches for {player_id}: {error}"
         ) from error
     return response.text
 
 
 def _parse_matches(raw_data):
-    """Convert Tennis Abstract JavaScript into a DataFrame."""
+    """Convert a JavaScript match array into a DataFrame."""
     match = re.search(
-        r"var\s+morematchmx\s*=\s*(\[.*?\]);",
+        r"var\s+morematchmx\s*=\s*(\[.*?\])\s*;",
         raw_data,
         re.DOTALL
     )
-
-    if match is None:
-        raise ValueError("Could not find career match data.")
-
+    if not match:
+        raise ValueError("Could not find match records in JavaScript.")
     try:
-        matches = json.loads(match.group(1))
+        records = json.loads(match.group(1))
     except json.JSONDecodeError as error:
-        raise ValueError("Invalid match data format.") from error
-
-    return pd.DataFrame(matches)
-
-
-def _calculate_age(dates, birth_date):
-    """Calculate age in years from dates."""
-    return (dates - birth_date).dt.days / 365.25
+        raise ValueError("Could not parse match records.") from error
+    return pd.DataFrame(records)
 
 
-def _clean_female_matches(df):
-    """Process matches containing opponent birth dates."""
+def _get_male_dob(player_id):
+    """Read a birthday from a men's Tennis Abstract profile."""
+    url = (
+        "https://www.tennisabstract.com/cgi-bin/"
+        f"player-classic.cgi?p={player_id}"
+    )
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    match = re.search(
+        r"var\s+dob\s*=\s*['\"]?(\d{8})",
+        response.text
+    )
+    if not match:
+        return None
+    dob = match.group(1)
+    return dob if pd.notna(
+        pd.to_datetime(dob, format="%Y%m%d", errors="coerce")
+    ) else None
+
+
+@lru_cache(maxsize=1)
+def _load_wta_players():
+    """Download and cache the WTA player directory."""
+    url = (
+        "https://raw.githubusercontent.com/ivanxieau/"
+        "WTA_TennisAbstract/master/wta_players.csv"
+    )
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+    except requests.RequestException as error:
+        raise ValueError(
+            "Could not download the WTA player directory."
+        ) from error
+
+    return pd.read_csv(
+        StringIO(response.text),
+        usecols=["name_first", "name_last", "dob"],
+        dtype={"dob": "string"}
+    )
+
+
+def _get_female_dob(player_id):
+    """Look up a player's birthday in the WTA directory."""
+    players = _load_wta_players()
+    names = (
+        players["name_first"].fillna("")
+        + players["name_last"].fillna("")
+    ).str.replace(r"\s+", "", regex=True).str.casefold()
+
+    dates = players.loc[
+        names == player_id.casefold(), "dob"
+    ].dropna()
+
+    if dates.empty:
+        raise ValueError(f"Could not find birthday for {player_id}.")
+    dob = str(dates.iloc[0])
+    if pd.isna(pd.to_datetime(dob, format="%Y%m%d", errors="coerce")):
+        raise ValueError(f"Invalid birthday for {player_id}.")
+    return dob
+
+
+def _get_player_dob(player_id):
+    """Look up a player's birthday, checking WTA first."""
+    try:
+        return _get_female_dob(player_id)
+    except ValueError as error:
+        if "Could not find birthday" not in str(error):
+            raise
+
+    dob = _get_male_dob(player_id)
+    if dob is None:
+        raise ValueError(f"Could not find birthday for {player_id}.")
+    return dob
+
+
+def _clean_matches(df, player_dob):
+    """Calculate player ages, opponent ages, and differences."""
     cleaned = df[[0, 4, 11, 16]].copy()
     cleaned.columns = [
-        "date", "result", "opponent", "opponent_dob"
+        "date", "result", "opponent", "raw_opponent_age"
     ]
-    cleaned["opponent_dob"] = pd.to_datetime(
-        cleaned["opponent_dob"],
-        format="%Y%m%d",
-        errors="coerce"
+    cleaned["date"] = pd.to_datetime(
+        cleaned["date"], format="%Y%m%d", errors="coerce"
     )
-    cleaned["opponent_age"] = _calculate_age(
-        cleaned["date"], cleaned["opponent_dob"]
+    raw = cleaned.pop("raw_opponent_age").astype("string").str.strip()
+    has_dob = raw.str.fullmatch(r"\d{8}").fillna(False)
+    opponent_dob = pd.to_datetime(
+        raw.where(has_dob), format="%Y%m%d", errors="coerce"
     )
-    return cleaned.drop(columns="opponent_dob")
-
-
-def _clean_male_matches(df):
-    """Process matches containing opponent ages."""
-    cleaned = df[[0, 4, 11, 16]].copy()
-    cleaned.columns = [
-        "date", "result", "opponent", "opponent_age"
-    ]
-    cleaned["opponent_age"] = pd.to_numeric(
-        cleaned["opponent_age"], errors="coerce"
+    opponent_age = pd.to_numeric(
+        raw.where(~has_dob), errors="coerce"
     )
-    return cleaned
-
-
-def _clean_matches(df, player_dob, female):
-    """Produce a DataFrame ready for plotting."""
-    df = df.copy()
-    df[0] = pd.to_datetime(
-        df[0], format="%Y%m%d", errors="coerce"
-    )
-    if female:
-        cleaned = _clean_female_matches(df)
-    else:
-        cleaned = _clean_male_matches(df)
-    cleaned["player_age"] = _calculate_age(
-        cleaned["date"], pd.Timestamp(player_dob)
-    )
+    opponent_age.loc[has_dob] = (
+        cleaned.loc[has_dob, "date"] - opponent_dob.loc[has_dob]
+    ).dt.days / 365.25
+    cleaned["opponent_age"] = opponent_age
+    cleaned["player_age"] = (
+        cleaned["date"] - pd.Timestamp(player_dob)
+    ).dt.days / 365.25
     cleaned["age_difference"] = (
         cleaned["player_age"] - cleaned["opponent_age"]
     )
+    cleaned = cleaned[cleaned["result"].isin(["W", "L"])]
     return cleaned.dropna(
-        subset=["player_age", "opponent_age"]
+        subset=["date", "player_age", "opponent_age"]
     ).reset_index(drop=True)
 
 
 def get_player_data(player_name):
-    """Retrieve and clean a tennis player's career matches."""
-    name = _normalize_name(player_name)
+    """Download and clean a player's career match data for plotting."""
+    player_id = _normalize_name(player_name)
+    raw = _download_player_data(player_id)
+    matches = _parse_matches(raw)
 
-    if name not in PLAYERS:
-        raise ValueError(
-            f"Player '{player_name}' is not supported."
-        )
+    if matches.empty or matches.shape[1] <= 16:
+        raise ValueError(f"No usable match data for {player_name}.")
 
-    player_id, player_dob = PLAYERS[name]
-    raw_data = _download_player_data(player_id)
-    df = _parse_matches(raw_data)
-
-    if df.empty or df.shape[1] <= 16:
-        raise ValueError("No valid career match data found.")
-
-    female = player_id == "SerenaWilliams"
-    return _clean_matches(df, player_dob, female)
+    dob = _get_player_dob(player_id)
+    return _clean_matches(matches, dob)
