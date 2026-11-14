@@ -1,130 +1,137 @@
-# HW3) R/Python Package
+# tennispack
 
-## About
+A Python package for retrieving, cleaning, and visualizing professional tennis players' career match data.
 
-This assignment is the continuation of HW1 and HW2. This time you will take the next step by creating a package (R or Python) to retrieve the career matches of a given player (e.g. Serena Williams, Rafael Nadal) from tennisabstract.com, and make a plot like the NYT's data visualization of HW2 (ignoring annotations).
+This package was developed for UC Berkeley's STAT 159 Homework 3, building on the data collection and visualization work from HW1 and HW2.
 
-## Main Functions
+## Overview
 
-Your package should have two primary functions:
+`tennispack` allows users to retrieve tennis match data from Tennis Abstract and generate scatter plots comparing a player's age with the age difference between the player and their opponents.
 
-1) Function to get the career's data of a given player
+The package provides two main functions:
 
-    - Input: name of player, e.g. `"serena williams"`, or `"Serena Williams"` or `"SerenaWilliams"`
-    - Output: data frame to be used for graphing purposes (like the `serena` data frame of HW2)
-    - If the user provides an invalid name of a player (`"Gaston Sanchez"`), then it should return a meaningful error message.
+- `get_player_data(player_name)`: Retrieves and processes a player's career match data into a pandas DataFrame.
+- `plot_player_matches(df)`: Generates a scatter plot showing player age on the x-axis and the difference between player and opponent ages on the y-axis, with matches colored by win/loss status.
 
-2) Function to make the scatter plot---like the plot you graphed in HW2 (without annotations)
+The package supports both men's and women's tennis data and handles differences in how opponent ages are recorded.
 
-For example, suppose the functions of my package are `data_function()` and `plot_function()`. BTW: give better names to your functions. Under this assumption, a user should be able to call my functions like so:
+## Installation
 
-```r
-# Serena Williams data and plot
-serena = data_function("serena williams")
-plot_function(serena)
-
-# Rafael Nadal data and plot
-rafa = data_function("Rafael Nadal")
-plot_function(rafa)
-
-# returns a meaningful error message
-unknown_player = data_function("GastonSanchez")
-```
-
-## Package Specifications
-
-### Public Functions
-
-As mentioned above, your package should have two main (public) functions:
-
-- One function to get data from tennis abstract, and process it to return a clean data frame.
-- One function that takes the cleaned-processed data frame to produce a scatter plot
-
-### Private Functions
-
-In addition to the public functions, you can use any number of auxiliary private functions.
-
-### Function Length
-
-No function should be longer than 20 lines of code (excluding comments and empty lines)
-
-- try to limit the length of private functions to no more than 10 lines
-
-### Naming Functions
-
-Follow good practices for naming functions:
-
-- choose a consistent style: `snake_case()`, `camelCase()`, `MixedCaps()`
-- name of functions should be intuitive, clear
-- name of arguments should also be clear
-
-### Tests
-
-Because the raw data comes from a website (tennisabstract.com), we will follow the gold standard of **avoid hitting live servers entirely during automated tests**.
-
-We will focus on writing tests for functions that handle the cleaning/processing of the JS files, e.g. `SerenaWilliamsCareer.JS`
-
-> **IMPORTANT: Female vs Male players**
->
-> Notice that Career JS files of female players are different from those of male players.
->
-> - <https://www.tennisabstract.com/jsmatches/SerenaWilliamsCareer.js>
-> - <https://www.tennisabstract.com/jsmatches/RafaelNadalCareer.js>
->
-> Files of female players contain the date-of-birth of the opponents, from which their age has to be derived. In contrast, files of male players already contain the age of the opponent.
-
-To write your tests, we recommend that you use the following mockup JS content.
-
-**`FemalePlayerCareer.JS`**
-```text
-# A few entries from a female player career's JS file
-var morematchmx = [["19951030", "Canadian Open", "Carpet", "W", "L", "", "", "WC", "Q1", "6-1 6-1", "3", "Anne Miller", "149", "7", "", "R", "19770119", "", "USA", "0", "", "", "", "", "", "", "1995-W-WT-CAN-02A-1995-013"],
-  ["19970307", "Indian Wells", "Hard", "W", "L", "", "", "WC", "Q1", "6-4 6-0", "3", "Alexia Dechaume Balleret", "87", "", "", "R", "19700503", "", "FRA", "0", "", "", "", "", "", "", "1997-W-WT-USA-02A-1997-006"],
-  ["19970804", "Manhattan Beach", "Hard", "W", "L", "", "", "WC", "Q3", "7-6 4-6 6-3", "3", "Magui Serna", "54", "6", "", "L", "19790301", "167", "ESP", "0", "", "", "", "", "", "", "1997-W-WT-USA-07A-1997-026"]]
-```
-
-**`MalePlayerCareer.JS`**
-```text
-# A few entries from a male player career's JS file
-var morematchmx = [["20010910", "Spain F10", "Hard", "S", "L", "", "", "WC", "R32", "2-6 7-5 6-2", "3", "Guillermo Platel", "731", "", "", "R", "22.264202601", "", "ESP", "0", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "2001-M-FU-ESP-10A-2001-002", "", "1", "1"],
-  ["20010917", "Seville CH", "Clay", "C", "L", "", "", "WC", "R16", "3-6 6-1 6-3", "3", "Stefano Galvani", "161", "2", "", "R", "24.2902121834", "178", "ITA", "0", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "2", "", "", "", "2001-784-024", "", "2", "2"],
-  ["20010917", "Seville CH", "Clay", "C", "W", "", "", "WC", "R32", "6-4 6-4", "3", "Israel Matos Gil", "751", "", "Q", "U", "18.7597535934", "", "ESP", "0", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "2001-784-015", "", "1", "1"]]
-```
-
-## Other Considerations
-
-### How we will use/test your package
-
-The *litmus test* of your hw3 submission will involve a direct installation from your github repository, and then using your 2 public functions to obtain and plot the data of a handful of players.
-
-**If you create an R package**
-
-We'll run either the `"devtools"` function `install_github()` or the `"pak"` function `pack()`
-
-```r
-# R package
-devtools::install_github("username/yourpackage")
-
-# equivalent
-pak::pak("username/yourpackage")
-```
-
-**If you create a Python package**
-
-To install a Python package directly from a GitHub repository, we'll use the `pip install` command prefixed with `git+` followed by your repository's URL.
+The package can be installed directly from GitHub using pip:
 
 ```bash
-# Python package
-pip install git+https://github.com/username/yourpackage.git
+pip install git+https://github.com/UCB-stat159-f26/hw03-2-tiffanyyu91.git
 ```
 
-### Commits
+Dependencies include:
 
-As usual, we will grade commit mechanics (how changes are packaged and documented) alongside workflow integrity (how git was used as a tool for reproducible research, rather than a few bulk upload commits).
+- pandas
+- requests
+- matplotlib
 
-- Each commit should represent a coherent, single step; i.e. no massive commits.
-- Each commits should have a concise, descriptive message; i.e. no vague messages.
+## Usage
 
-### Makefile and Environment
+Import the two main functions:
 
-Because this HW involves developing and submitting a package, there is no need to include `Makefile` and `environment.yml` files.
+```python
+from tennispack import get_player_data, plot_player_matches
+```
+
+### Retrieving Player Data
+
+Retrieve Serena Williams's career match data:
+
+```python
+serena = get_player_data("Serena Williams")
+print(serena.head())
+```
+
+The function returns a DataFrame containing match dates, results, opponent names, opponent ages, player ages, and age differences.
+
+The same function can be used for other players:
+
+```python
+rafa = get_player_data("Rafael Nadal")
+iga = get_player_data("Iga Swiatek")
+```
+
+Player names can be provided with different capitalizations and spacing, subject to Tennis Abstract's player naming conventions.
+
+### Creating Visualizations
+
+Generate a scatter plot for Serena Williams:
+
+```python
+plot_player_matches(serena)
+```
+
+Or for Rafael Nadal:
+
+```python
+plot_player_matches(rafa)
+```
+
+The visualization displays:
+
+- **X-axis:** Player's age at the time of the match
+- **Y-axis:** Player's age minus opponent's age
+- **Color:** Win or loss
+
+A horizontal reference line at zero indicates when the player and opponent were the same age.
+
+### Invalid Inputs
+
+If the requested player's data cannot be found, the function raises a meaningful error.
+
+For example:
+
+```python
+get_player_data("Tiffany Yu")
+```
+
+## Data Sources and Processing
+
+Career match data is retrieved from [Tennis Abstract](https://www.tennisabstract.com/).
+
+The package extracts match records from JavaScript files and converts them into pandas DataFrames.
+
+Because opponent information is stored differently across player datasets, the package handles both birth dates and numerical ages. When opponent birth dates are provided, the package calculates their ages at the time of each match.
+
+Player birth dates are retrieved using Tennis Abstract player profiles and an external [WTA player dataset](https://github.com/ivanxieau/WTA_TennisAbstract).
+
+Age differences are calculated as:
+
+**Age Difference = Player Age − Opponent Age**
+
+The package requires an internet connection to retrieve player data. Availability depends on the external data sources, and some players or records may be unavailable.
+
+## Testing
+
+Automated tests are included in the `tests/` directory.
+
+The tests cover:
+
+- Player name normalization
+- Invalid name inputs
+- Parsing JavaScript match records
+- Processing female player match data
+- Processing male player match data
+- Calculating player and opponent ages
+
+Tests use simulated match records instead of requesting data from live Tennis Abstract servers.
+
+To run the tests, navigate to the project directory and execute:
+
+```bash
+python -m pytest tests/ -v
+```
+
+## Personal Reflections
+
+This assignment was really interesting. Throughout my time at Berkeley, I have imported packages hundreds of time but never examined what a package was made of. With this homework, I learned how to turn code into a reusable python package. I also learned how to separate scripts into organized code functions and edit code so that each function was not too long. This was to ensure readability and generalizable code so that someone else could install and use it. 
+
+One challenge was working with both men's and women's data. There were inconsistencies in how the age data was presented either with a birth date or an actual age. Several times, my code would pull a women's birthday from the men's data set resulting in a crazy age and age difference with their opponent. I had to debug the code to retrieve the correct player information with the correct gender data set. Debugging these problems reinforced the importance of checking intermediate outputs rather than assuming that successfully running code means the results are correct.
+
+I also learned more about Python package structure. I learned more about `__init__.py`, `pyproject.toml`, and separate modules for data processing and visualization. Writing automated tests helped me understand how to verify individual functions without relying on external websites.
+
+Overall, this assignment gave me more experience with modular programming, debugging, automated testing, and reproducibility. It also helped me see how organizing code into a package makes an analysis easier to reuse and maintain.
