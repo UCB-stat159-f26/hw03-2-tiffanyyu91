@@ -130,9 +130,8 @@ def _get_player_dob(player_id):
         raise ValueError(f"Could not find birthday for {player_id}.")
     return dob
 
-
-def _clean_matches(df, player_dob):
-    """Calculate player ages, opponent ages, and differences."""
+def _prepare_matches(df):
+    """Select and format the match columns."""
     cleaned = df[[0, 4, 11, 16]].copy()
     cleaned.columns = [
         "date", "result", "opponent", "raw_opponent_age"
@@ -140,18 +139,27 @@ def _clean_matches(df, player_dob):
     cleaned["date"] = pd.to_datetime(
         cleaned["date"], format="%Y%m%d", errors="coerce"
     )
-    raw = cleaned.pop("raw_opponent_age").astype("string").str.strip()
+    return cleaned
+
+
+def _opponent_ages(cleaned):
+    """Convert opponent birth dates or ages into years."""
+    raw = cleaned["raw_opponent_age"].astype("string").str.strip()
     has_dob = raw.str.fullmatch(r"\d{8}").fillna(False)
     opponent_dob = pd.to_datetime(
         raw.where(has_dob), format="%Y%m%d", errors="coerce"
     )
-    opponent_age = pd.to_numeric(
-        raw.where(~has_dob), errors="coerce"
-    )
-    opponent_age.loc[has_dob] = (
+    ages = pd.to_numeric(raw.where(~has_dob), errors="coerce")
+    ages.loc[has_dob] = (
         cleaned.loc[has_dob, "date"] - opponent_dob.loc[has_dob]
     ).dt.days / 365.25
-    cleaned["opponent_age"] = opponent_age
+    return ages
+
+
+def _clean_matches(df, player_dob):
+    """Calculate ages and prepare match data for plotting."""
+    cleaned = _prepare_matches(df)
+    cleaned["opponent_age"] = _opponent_ages(cleaned)
     cleaned["player_age"] = (
         cleaned["date"] - pd.Timestamp(player_dob)
     ).dt.days / 365.25
@@ -159,11 +167,13 @@ def _clean_matches(df, player_dob):
         cleaned["player_age"] - cleaned["opponent_age"]
     )
     cleaned = cleaned[cleaned["result"].isin(["W", "L"])]
-    return cleaned.dropna(
+    cleaned = cleaned.dropna(
         subset=["date", "player_age", "opponent_age"]
+    )
+    return cleaned.drop(
+        columns="raw_opponent_age"
     ).reset_index(drop=True)
-
-
+    
 def get_player_data(player_name):
     """Download and clean a player's career match data for plotting."""
     player_id = _normalize_name(player_name)
