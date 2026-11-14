@@ -1,0 +1,40 @@
+## AI Documentation – HW3
+
+I used ChatGPT -6 by OpenAI.
+
+I tested the suggested code in JupyterLab, inspected intermediate DataFrames to verify calculations, and made adjustments based on errors and test results. AI was primarily used for code generation, debugging, and understanding package development practices. I would also send error messages to the chatbox so it could help me understand what was wrong. 
+
+Prompts: 
+
+"what are first steps, what is the end goal"
+
+
+
+"can i use notebooks or does it have to be py"
+
+
+
+"should i run the exploration notebook"
+
+
+
+"what should be in data.py"
+
+
+
+"where do i run the python code"
+
+
+
+"do i need to have an exploration notebook, what do i need for code in the files for the final subsmission"
+
+
+
+"how do i delete the player dictionary"
+
+
+"what is the check list according to the original hw"
+
+
+
+"how many commits is reasonable"
